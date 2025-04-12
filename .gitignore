@@ -1,0 +1,19 @@
+cat > .gitignore <<'EOF'
+# ---- global ignores (backend + frontend) ----
+.DS_Store
+node_modules/
+.next/
+.turbo/
+env/
+venv/
+.venv/
+__pycache__/
+*.py[cod]
+*.log
+backend/.env
+biasgpt-frontend/.env*
+backend/ml/data/
+backend/ml/models/
+EOF
+biasgpt-frontend/eslint.config.mjs
+biasgpt-frontend/tsconfig.json
