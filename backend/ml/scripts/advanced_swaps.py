@@ -1,51 +1,41 @@
 import spacy
 
-"""
-This module demonstrates an ADVANCED approach to demographic swapping using spaCy.
-It uses Named Entity Recognition (NER) to detect PERSON entities and a token-level
-approach to handle pronouns.
+# Try to load the spaCy English model. If not found, prompt the user to install it.
+try:
+    NLP = spacy.load("en_core_web_sm")
+except OSError:
+    raise RuntimeError("spaCy model 'en_core_web_sm' not found. Run: python -m spacy download en_core_web_sm")
 
-You can import and call the `swap_demographics_spacy` function in data_pipeline.py
-or anywhere else in your code.
+############################################
+#      Demographic Swap Dictionaries       #
+############################################
 
-INSTALLATION:
-    pip install spacy
-    python -m spacy download en_core_web_sm
-"""
-
-
-nlp = spacy.load("en_core_web_sm")
-
-# Example dictionary of male-to-female name swaps
+# Mapping for male-to-female name swaps.
 NAME_SWAPS_MALE_FEMALE = {
     "John": "Maria",
     "Michael": "Jessica",
     "Robert": "Laura",
     "James": "Sarah",
     "David": "Emily",
-    # etc. Expand as needed.
 }
 
-# Example dictionary for pronoun swaps (male->female)
+# Mapping for male-to-female pronoun swaps.
 PRONOUN_SWAPS_M2F = {
-    "he": "she",
-    "He": "She",
-    "him": "her",
-    "Him": "Her",
-    "his": "her",
-    "His": "Her",
-    "father": "mother",
-    "Father": "Mother",
-    # etc.
+    "he": "she", "He": "She",
+    "him": "her", "Him": "Her",
+    "his": "her", "His": "Her",
+    "father": "mother", "Father": "Mother",
 }
 
-# Example dictionary for last names or any other relevant words
-# Use as needed.
+# Mapping for last name swaps.
 LASTNAME_SWAPS = {
     "Smith": "Rodriguez",
     "Miller": "Johnson",
 }
 
+############################################
+#      Function: swap_demographics_spacy   #
+############################################
 
 def swap_demographics_spacy(
     text: str,
@@ -54,13 +44,26 @@ def swap_demographics_spacy(
     last_name_swaps: dict = None,
 ) -> str:
     """
-    Use spaCy to parse text, detect PERSON entities, and then build a new text.
-    - name_swaps: dictionary for swapping first names
-    - pronoun_swaps: dictionary for swapping pronouns (e.g., male->female)
-    - last_name_swaps: dictionary for swapping last names
+    Swap demographic information in the text using spaCy NER.
 
-    Returns: A new string with swapped entities & tokens.
+    This function uses spaCy's named entity recognition (NER) to find PERSON entities
+    within the text. For tokens that are part of a PERSON entity, it attempts to replace
+    them using provided name or last name swap dictionaries. For tokens outside of a PERSON
+    entity, it checks for pronoun swaps.
+
+    Parameters:
+        text (str): The original text to modify.
+        name_swaps (dict, optional): Replacement mapping for first names.
+                                     Defaults to an empty dict if not provided.
+        pronoun_swaps (dict, optional): Replacement mapping for pronouns.
+                                        Defaults to an empty dict if not provided.
+        last_name_swaps (dict, optional): Replacement mapping for last names.
+                                          Defaults to an empty dict if not provided.
+
+    Returns:
+        str: The modified text after applying the demographic swaps.
     """
+    # Initialize swap dictionaries if they are not provided.
     if not name_swaps:
         name_swaps = {}
     if not pronoun_swaps:
@@ -68,53 +71,62 @@ def swap_demographics_spacy(
     if not last_name_swaps:
         last_name_swaps = {}
 
-    doc = nlp(text)
+    # Process the input text using spaCy.
+    doc = NLP(text)
+    new_tokens = []  # List to hold the new token texts.
+    entity_indexes = set()  # Set to hold indices of tokens that are part of PERSON entities.
 
-    # We'll build a list of tokens we can modify
-    new_tokens = []
-
-    # We'll keep track of entity boundaries to avoid duplicating replacements
-    entity_indexes = set()
+    # Identify tokens belonging to PERSON entities.
     for ent in doc.ents:
         if ent.label_ == "PERSON":
             for i in range(ent.start, ent.end):
                 entity_indexes.add(i)
 
+    # Iterate over each token to apply the swaps.
     for i, token in enumerate(doc):
-        # If this token is part of a PERSON entity, handle name swaps
+        # If the token is part of a PERSON entity, attempt to swap using first name or last name mappings.
         if i in entity_indexes:
-            # Check if the token text is in name_swaps or last_name_swaps
-            # We do a .strip() or .lower() comparison if needed
-            base_form = token.text
-            if base_form in name_swaps:
-                new_tokens.append(name_swaps[base_form])
-            elif base_form in last_name_swaps:
-                new_tokens.append(last_name_swaps[base_form])
+            word = token.text
+            if word in name_swaps:
+                new_tokens.append(name_swaps[word])
+            elif word in last_name_swaps:
+                new_tokens.append(last_name_swaps[word])
             else:
-                # If no direct match, leave it as is
-                new_tokens.append(base_form)
+                new_tokens.append(word)
         else:
-            # Not in a PERSON entity, handle pronoun swaps or else keep token
+            # Outside PERSON entities, check for pronoun swaps.
             if token.text in pronoun_swaps:
                 new_tokens.append(pronoun_swaps[token.text])
             else:
                 new_tokens.append(token.text)
 
-    # Reconstruct sentence
-    return " ".join(new_tokens)
+    # Reconstruct the text, preserving the original whitespace.
+    reconstructed_text = "".join([t + doc[i].whitespace_ for i, t in enumerate(new_tokens)])
+    return reconstructed_text
 
+############################################
+#             Demo Function                #
+############################################
 
 def demo_swap():
-    text = "John Smith said he would help his father, Michael Miller, soon."  # example
-    swapped_text = swap_demographics_spacy(
+    """
+    Demonstrates the demographic swapping by applying the swaps
+    to an example sentence and printing the before and after.
+    """
+    text = "John Smith said he would help his father, Michael Miller, soon."
+    swapped = swap_demographics_spacy(
         text,
         name_swaps=NAME_SWAPS_MALE_FEMALE,
         pronoun_swaps=PRONOUN_SWAPS_M2F,
-        last_name_swaps=LASTNAME_SWAPS
+        last_name_swaps=LASTNAME_SWAPS,
     )
-
     print("Original:", text)
-    print("Swapped :", swapped_text)
+    print("Swapped :", swapped)
+
+############################################
+#               Main Section               #
+############################################
 
 if __name__ == "__main__":
+    # Run the demo if the script is executed directly.
     demo_swap()

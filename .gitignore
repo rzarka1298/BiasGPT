@@ -15,5 +15,3 @@ biasgpt-frontend/.env*
 backend/ml/data/
 backend/ml/models/
 EOF
-biasgpt-frontend/eslint.config.mjs
-biasgpt-frontend/tsconfig.json
